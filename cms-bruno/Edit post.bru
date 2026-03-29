@@ -1,0 +1,22 @@
+meta {
+  name: Edit post
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+     
+      "title": "Introduction to HTTP",
+      "date": "2026-03-20",
+      "content": "HTTP is the foundational protocol of communication on the web. It defines how clients and servers exchange data.",
+      "keywords": ["http", "web","backend"]
+    }
+  
+}
