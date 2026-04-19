@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../lib/prisma");
+const authenticate = require("../middleware/auth");
+const isOwner = require("../middleware/isOwner");
 
 
 function formatPost(post) {
@@ -11,6 +13,7 @@ function formatPost(post) {
   };
 }
 
+router.use(authenticate);
 
 // GET /api/posts, /api/posts?keyword=http
 router.get("/", async (req, res) => {
@@ -67,7 +70,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT /api/posts/:postId
-router.put("/:postId", async (req, res) => {
+router.put("/:postId", isOwner, async (req, res) => {
     const postId = Number(req.params.postId);
     const { title, date, content, keywords} = req.body;
 
@@ -100,7 +103,7 @@ router.put("/:postId", async (req, res) => {
 });
 
 // DELETE /api/posts/:postId
-router.delete("/:postId", async (req, res) => {
+router.delete("/:postId", isOwner, async (req, res) => {
     const postId = Number(req.params.postId);
     const post = await prisma.post.findUnique({
         where: { id: postId },
