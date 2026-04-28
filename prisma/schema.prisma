@@ -13,6 +13,7 @@ model User {
   password String @db.VarChar(255)
   name     String @db.VarChar(100)
   posts    Post[]
+  likes    Like[]
 
   @@map("users")
 }
@@ -22,11 +23,25 @@ model Post {
   title    String    @db.VarChar(255)
   date     DateTime
   content  String    @db.Text
+  imageUrl String?   @db.VarChar(255)
   keywords Keyword[]
   userId   Int
   user     User      @relation(fields: [userId], references: [id])
-  
+  likes    Like[]
+
   @@map("posts")
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId])
+  @@map("likes")
 }
 
 model Keyword {
