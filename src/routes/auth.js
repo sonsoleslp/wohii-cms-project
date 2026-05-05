@@ -3,67 +3,71 @@ const router = express.Router();
 const prisma = require("../lib/prisma");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const { z } = require("zod");
+const {
+  ValidationError,
+  ConflictError,
+  UnauthorizedError,
+} = require("../lib/errors");
+
 const SECRET = process.env.JWT_SECRET;
+
+const RegisterInput = z.object({
+  email: z.string().min(1).max(255),
+  password: z.string().min(1).max(72),
+  name: z.string().min(1).max(100),
+});
+
+const LoginInput = z.object({
+  email: z.string().min(1),
+  password: z.string().min(1),
+});
 
 // POST /api/auth/register
 router.post("/register", async (req, res) => {
-    const { email, password, name } = req.body;
-    if (!email || !password || !name ) {
-        return res.status(400).json({ error: "email, password and name are required" });
-    }
+  const { email, password, name } = RegisterInput.parse(req.body);
 
-    // Check if the user exists already
-    const existingUser = await prisma.user.findUnique({
-        where: {email}
-    });
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    throw new ConflictError("Email already registered");
+  }
 
-    if (existingUser) {
-        return res.status(409).json({ error: "Email already registered" });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = await prisma.user.create({
+    data: { email, password: hashedPassword, name },
+  });
 
-    const user = await prisma.user.create({
-        data: {
-            email, password: hashedPassword, name
-        }
-    });
+  const token = jwt.sign({ userId: user.id }, SECRET, {
+    expiresIn: "1h",
+    algorithm: "HS256",
+  });
 
-    const token = jwt.sign({userId: user.id}, SECRET, {expiresIn: "1h"});
-
-    res.status(201).json({
-        message: "User registered successfully",
-        token
-    });
-})
+  res.status(201).json({
+    message: "User registered successfully",
+    token,
+  });
+});
 
 // POST /api/auth/login
-router.post("/login", async (req,res) => {
-    const { email, password } = req.body;
-    if (!email || !password ) {
-        return res.status(400).json({ error: "email, password are required" });
-    }
+router.post("/login", async (req, res) => {
+  const { email, password } = LoginInput.parse(req.body);
 
-    // Find user
-    const user = await prisma.user.findUnique({
-        where: {email}
-    });
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new UnauthorizedError("Invalid credentials");
+  }
 
-    if (!user) {
-        return res.status(401).json({ error: "Invalid credentials" });
-    }
+  const isValid = await bcrypt.compare(password, user.password);
+  if (!isValid) {
+    throw new UnauthorizedError("Invalid credentials");
+  }
 
-    const isValid = await bcrypt.compare(password, user.password);
+  const token = jwt.sign({ userId: user.id }, SECRET, {
+    expiresIn: "1h",
+    algorithm: "HS256",
+  });
 
-    if (!isValid) {
-        return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    // Generate token
-    const token = jwt.sign({ userId: user.id }, SECRET, { expiresIn: "1h" });
-
-    res.json({ token });
-
-})
-
+  res.json({ token });
+});
 
 module.exports = router;
